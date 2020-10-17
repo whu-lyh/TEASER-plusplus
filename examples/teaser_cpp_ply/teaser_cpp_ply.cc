@@ -8,6 +8,11 @@
 #include <teaser/ply_io.h>
 #include <teaser/registration.h>
 
+// visuallization
+#include <pcl/point_cloud.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/common/transforms.h>
+
 // Macro constants for generating noise and outliers
 #define NOISE_BOUND 0.05
 #define N_OUTLIERS 1700
@@ -44,13 +49,25 @@ int main() {
   // Load the .ply file
   teaser::PLYReader reader;
   teaser::PointCloud src_cloud;
-  auto status = reader.read("./example_data/bun_zipper_res3.ply", src_cloud);
+  // official
+  // auto status = reader.read("./example_data/bun_zipper_res3.ply", src_cloud);
+  // real data
+  auto status = reader.read("./example_data/gaojia.ply", src_cloud);
   int N = src_cloud.size();
 
   // Convert the point cloud to Eigen
   Eigen::Matrix<double, 3, Eigen::Dynamic> src(3, N);
+
+  // Convert the teaser::PLYReader to pcl point cloud handler
+  pcl::PointCloud<pcl::PointXYZ>::Ptr p_src_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
   for (size_t i = 0; i < N; ++i) {
     src.col(i) << src_cloud[i].x, src_cloud[i].y, src_cloud[i].z;
+    pcl::PointXYZ pt;
+    pt.x = src_cloud[i].x;
+    pt.y = src_cloud[i].y;
+    pt.z = src_cloud[i].z;
+    p_src_cloud->push_back(pt);
   }
 
   // Homogeneous coordinates
@@ -74,6 +91,11 @@ int main() {
 
   // Add some noise & outliers
   addNoiseAndOutliers(tgt);
+
+  // get the pertuation point clouds
+  pcl::PointCloud<pcl::PointXYZ>::Ptr p_tar_cloud =
+      boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+  pcl::transformPointCloud(*p_src_cloud, *p_tar_cloud, T); // src2tar
 
   // Run TEASER++ registration
   // Prepare solver parameters
@@ -118,4 +140,34 @@ int main() {
             << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() /
                    1000000.0
             << std::endl;
+
+  // aligned point cloud
+  pcl::PointCloud<pcl::PointXYZ>::Ptr p_tar_cloud2 =
+      boost::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+  Eigen::Matrix4d Tteaser = Eigen::Matrix4d::Identity();
+  Tteaser.block<3, 3>(0, 0) = solution.rotation;
+  Tteaser.block<3, 1>(0, 3) = solution.translation;
+  pcl::transformPointCloud(*p_src_cloud, *p_tar_cloud2, Tteaser);
+
+  // visualization
+  pcl::visualization::PCLVisualizer visu3("clouds");
+  visu3.setBackgroundColor(255, 255, 255);
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> color(p_src_cloud, 0, 0, 255);
+  visu3.addPointCloud(p_src_cloud, color, "src_cloud");
+  visu3.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 6,
+                                         "src_cloud");
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> color2(p_tar_cloud, 0, 255, 0);
+  visu3.addPointCloud(p_tar_cloud, color2, "tar_cloud");
+  visu3.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 6,
+                                         "tar_cloud");
+  pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> color3(p_tar_cloud2, 255, 0, 0);
+  visu3.addPointCloud(p_tar_cloud2, color3, "tar_cloud2");
+  visu3.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 6,
+                                         "tar_cloud2");
+  visu3.spin();
+
+  // visualization class
+  // viewer_->setShowFPS(false);
+
+  return 1;
 }

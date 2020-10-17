@@ -5,12 +5,16 @@ set(CMAKE_CXX_STANDARD 14)
 
 find_package(Eigen3 REQUIRED)
 find_package(teaserpp REQUIRED)
+find_package(PCL 1.8 REQUIRED )
+
+#add pcl include directories
+include_directories(${PCL_INCLUDE_DIRS})
 
 # Change this line to include your own executable file
 add_executable(teaser_cpp_ply teaser_cpp_ply.cc)
 
 # Link to teaserpp & Eigen3
-target_link_libraries(teaser_cpp_ply Eigen3::Eigen teaserpp::teaser_registration teaserpp::teaser_io)
+target_link_libraries(teaser_cpp_ply Eigen3::Eigen teaserpp::teaser_registration teaserpp::teaser_io ${PCL_LIBRARIES})
 
 # Copy the data files to build directory
 file(COPY ../example_data/
